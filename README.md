@@ -2,7 +2,7 @@
 
 ## A fork to extend the original work by eentzel
 
-[![Build Status](https://travis-ci.org/squeeze69/dbf.svg?branch=master)](https://travis-ci.org/squeeze69/dbf)
+[![Build Status](https://travis-ci.com/squeeze69/dbf.svg?branch=master)](https://travis-ci.org/squeeze69/dbf)
 
 So far, I've added some field types and made some minor tweak changes.
 But I'd like to extend them and add support for more field types (adding an ad hoc handling for Clipper, FoxPro and so on).
