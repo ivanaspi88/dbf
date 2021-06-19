@@ -1,7 +1,6 @@
 package dbf
 
 // reference implementation:
-//     http://dbf.berlios.de/ - broken link
 //     info on xbase files: http://www.clicketyclick.dk/databases/xbase/format/index.html
 
 // test data: http://abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/2923.0.30.0012006?OpenDocument
@@ -117,7 +116,7 @@ func NewReader(r io.ReadSeeker) (*Reader, error) {
 	if eoh, err := br.ReadByte(); err != nil {
 		return nil, err
 	} else if eoh != 0x0D {
-		return nil, fmt.Errorf("Header was supposed to be %d bytes long, but found byte %#x at that offset instead of expected byte 0x0D", h.Headerlen, eoh)
+		return nil, fmt.Errorf("header was supposed to be %d bytes long, but found byte %#x at that offset instead of expected byte 0x0D", h.Headerlen, eoh)
 	}
 
 	return &Reader{r, 1900 + int(h.Year),
@@ -166,7 +165,7 @@ func (r *Reader) FieldNames() []string {
 //FieldInfo : returns the Field's Info
 func (r *Reader) FieldInfo(i int) (*Field, error) {
 	if i >= len(r.fields) {
-		return nil, fmt.Errorf("No Field number: %d", i)
+		return nil, fmt.Errorf("no Field number: %d", i)
 	}
 	return &r.fields[i], nil
 }
@@ -190,7 +189,7 @@ func (f *Field) validate() error {
 	case 'C', 'N', 'F', 'L', 'D', 'I', '+':
 		return nil
 	}
-	return fmt.Errorf("Sorry, dbf library doesn't recognize field type '%c', Field: '%s'", f.Type, Tillzero(f.Name[:]))
+	return fmt.Errorf("sorry, dbf library doesn't recognize field type '%c', Field: '%s'", f.Type, Tillzero(f.Name[:]))
 }
 
 //Field - field description
@@ -274,7 +273,7 @@ func (r *Reader) Read(i int) (rec Record, err error) {
 					rec[r.FieldName(i)], err = strconv.ParseFloat(fieldVal, 64)
 				}
 			}
-		case 'L': //Logical, T,F or Space (ternary) - sorry, you've got to rune
+		case 'L': //Logical, T,F or Space (ternary)
 			switch {
 			case fieldVal == "Y" || fieldVal == "T":
 				rec[r.FieldName(i)] = 'T'
@@ -285,7 +284,7 @@ func (r *Reader) Read(i int) (rec Record, err error) {
 				rec[r.FieldName(i)] = ' '
 				err = nil
 			default:
-				err = fmt.Errorf("Invalid Logical Field: %s", r.FieldName(i))
+				err = fmt.Errorf("invalid Logical Field: %s", r.FieldName(i))
 			}
 		case 'D': //Date - YYYYYMMDD - use time.Parse (reference date Jan 2, 2006)
 			tm, err = time.Parse("20060102", fieldVal)

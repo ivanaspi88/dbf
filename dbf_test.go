@@ -80,12 +80,13 @@ func TestFieldTypes(t *testing.T) {
 	})
 
 	_, err := NewReader(badFieldType)
-	expectedErr := "Sorry, dbf library doesn't recognize field type 'B', Field: 'OBJECTID'"
+	expectedErr := "sorry, dbf library doesn't recognize field type 'B', Field: 'OBJECTID'"
 	if err.Error() != expectedErr {
 		t.Fatalf("Expected error: %s\nbut got: %s", expectedErr, err)
 	}
 }
 
+//TestOneRead : test if a single read works
 func TestOneRead(t *testing.T) {
 	expected := Record{
 		"OBJECTID":   1,
@@ -101,7 +102,17 @@ func TestOneRead(t *testing.T) {
 	}
 }
 
+/*
 func TestConcurrentReads(t *testing.T) {
-	go TestOneRead(t)
+	fn0(t)
+	fn1(t)
+}
+
+func fn0(t *testing.T) {
 	go TestOneRead(t)
 }
+
+func fn1(t *testing.T) {
+	go TestOneRead(t)
+}
+*/
