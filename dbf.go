@@ -68,6 +68,7 @@ type Reader struct {
 	headerlen        uint16 // in bytes
 	recordlen        uint16 // length of each record, in bytes
 	flags            int32  //general purpose flags - see constant
+	sFieldNames      []string
 	sync.Mutex
 }
 
@@ -98,6 +99,8 @@ func NewReader(r io.ReadSeeker) (*Reader, error) {
 	}
 	var nfields = int(h.Headerlen/32 - 1)
 	fields := make([]Field, 0, nfields)
+	// array to cache names for later use
+	tFieldNames := make([]string, 0, nfields)
 	for offset := 0; offset < nfields; offset++ {
 		f := Field{}
 		if erbr := binary.Read(r, binary.LittleEndian, &f); erbr != nil {
@@ -110,6 +113,7 @@ func NewReader(r io.ReadSeeker) (*Reader, error) {
 			return nil, err
 		}
 		fields = append(fields, f)
+		tFieldNames = append(tFieldNames, Tillzero(f.Name[:]))
 	}
 
 	br := bufio.NewReader(r)
@@ -121,7 +125,7 @@ func NewReader(r io.ReadSeeker) (*Reader, error) {
 
 	return &Reader{r, 1900 + int(h.Year),
 		int(h.Month), int(h.Day), int(h.Nrec), fields,
-		h.Headerlen, h.Recordlen, 0, *new(sync.Mutex)}, nil
+		h.Headerlen, h.Recordlen, 0, tFieldNames, *new(sync.Mutex)}, nil
 }
 
 //ModDate - modification date
@@ -142,24 +146,13 @@ func Tillzero(s []byte) (name string) {
 
 //FieldName retrieves field name - check for NULL (0x00) termination
 // specs says that it should be 0x00 padded, but it's not always true
-func (r *Reader) FieldName(i int) (name string) {
-	for _, val := range string(r.fields[i].Name[:]) {
-		if val == 0 {
-			return
-		}
-		name = name + string(val)
-	}
-	return
+func (r *Reader) FieldName(i int) string {
+	return r.sFieldNames[i]
 }
 
 //FieldNames get an array with the fields' names
 func (r *Reader) FieldNames() []string {
-	//pre allocate array - to reduce risk of re-allocation with append
-	names := make([]string, 0, int(r.headerlen/32-1))
-	for i := range r.fields {
-		names = append(names, r.FieldName(i))
-	}
-	return names
+	return r.sFieldNames
 }
 
 //FieldInfo : returns the Field's Info
@@ -253,38 +246,38 @@ func (r *Reader) Read(i int) (rec Record, err error) {
 		//decodes the field's type, supported: F,N,D,L,C (defaults to string, anyway)
 		switch f.Type {
 		case 'F': //Float
-			rec[r.FieldName(i)], err = strconv.ParseFloat(fieldVal, 64)
+			rec[r.sFieldNames[i]], err = strconv.ParseFloat(fieldVal, 64)
 		case 'I', '+': //Long ('+' is autoincrement, like Long): I values are stored as binary values, LittleEndian, signed (leftmost bit=0: negative)
 			uv := uint32(binary.LittleEndian.Uint32(buf))
 			sv := int32(uv & 0x7fffffff)
 			if uv&(1<<31) == 0 {
 				sv = -sv
 			}
-			rec[r.FieldName(i)], err = sv, nil
+			rec[r.sFieldNames[i]], err = sv, nil
 		case 'N': //Numeric - dbf (mostrly, sigh) treats empty numeric fields as 0
 			if fieldVal == "" {
-				rec[r.FieldName(i)] = 0
+				rec[r.sFieldNames[i]] = 0
 				err = nil
 			} else {
 				//if DecimalPlaces == 0 it's a fixed length integer
 				if f.DecimalPlaces == 0 {
-					rec[r.FieldName(i)], err = strconv.Atoi(fieldVal)
+					rec[r.sFieldNames[i]], err = strconv.Atoi(fieldVal)
 				} else {
-					rec[r.FieldName(i)], err = strconv.ParseFloat(fieldVal, 64)
+					rec[r.sFieldNames[i]], err = strconv.ParseFloat(fieldVal, 64)
 				}
 			}
 		case 'L': //Logical, T,F or Space (ternary)
 			switch {
 			case fieldVal == "Y" || fieldVal == "T":
-				rec[r.FieldName(i)] = 'T'
+				rec[r.sFieldNames[i]] = 'T'
 			case fieldVal == "N" || fieldVal == "F":
-				rec[r.FieldName(i)] = 'F'
+				rec[r.sFieldNames[i]] = 'F'
 				err = nil
 			case fieldVal == "?" || fieldVal == "":
-				rec[r.FieldName(i)] = ' '
+				rec[r.sFieldNames[i]] = ' '
 				err = nil
 			default:
-				err = fmt.Errorf("invalid Logical Field: %s", r.FieldName(i))
+				err = fmt.Errorf("invalid Logical Field: %s", r.sFieldNames[i])
 			}
 		case 'D': //Date - YYYYYMMDD - use time.Parse (reference date Jan 2, 2006)
 			tm, err = time.Parse("20060102", fieldVal)
@@ -293,24 +286,24 @@ func (r *Reader) Read(i int) (rec Record, err error) {
 					err = nil
 					if r.flags&FlagDateAssql != 0 {
 						if r.flags&FlagEmptyDateAsZero != 0 {
-							rec[r.FieldName(i)] = "0000-00-00"
+							rec[r.sFieldNames[i]] = "0000-00-00"
 						} else {
-							rec[r.FieldName(i)] = ""
+							rec[r.sFieldNames[i]] = ""
 						}
 					} else {
 						//this is the zero time, as far the package time, states
-						rec[r.FieldName(i)] = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
+						rec[r.sFieldNames[i]] = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
 					}
 				}
 			} else {
 				if r.flags&FlagDateAssql != 0 {
-					rec[r.FieldName(i)] = tm.Format("2006-01-02")
+					rec[r.sFieldNames[i]] = tm.Format("2006-01-02")
 				} else {
-					rec[r.FieldName(i)] = tm
+					rec[r.sFieldNames[i]] = tm
 				}
 			}
 		default: //String value (C, padded with blanks) -Notice: blanks removed by the trim above
-			rec[r.FieldName(i)] = fieldVal
+			rec[r.sFieldNames[i]] = fieldVal
 		}
 		if err != nil {
 			return nil, err
@@ -329,9 +322,8 @@ func (r *Reader) ReadOrdered(i int) (orec OrderedRecord, err error) {
 		return nil, err
 	}
 	orec = make([]interface{}, 0, len(r.fields))
-	fns := r.FieldNames()
-	for i := range fns {
-		orec = append(orec, rec[fns[i]])
+	for i := range r.sFieldNames {
+		orec = append(orec, rec[r.sFieldNames[i]])
 	}
 	return orec, nil
 }
