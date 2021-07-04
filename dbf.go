@@ -205,7 +205,7 @@ func errSKIP(s string) *SkipError {
 	return ers
 }
 
-//Read - read record i
+//Read - read record i - first record has index 0
 func (r *Reader) Read(i int) (rec Record, err error) {
 	var tm time.Time
 	r.Lock()
