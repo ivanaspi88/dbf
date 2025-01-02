@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"github.com/ivanaspi88/charmap"
 )
 
 // Constants to use with SetFlags, use "or" to combine them (a | b | c... and so on)
@@ -286,7 +287,8 @@ func (r *Reader) Read(i int) (rec Record, err error) {
 					err = nil
 					if r.flags&FlagDateAssql != 0 {
 						if r.flags&FlagEmptyDateAsZero != 0 {
-							rec[r.sFieldNames[i]] = "0000-00-00"
+							//rec[r.sFieldNames[i]] = "0000-00-00"  // SQL Error!
+							rec[r.sFieldNames[i]] = nil  // work!
 						} else {
 							rec[r.sFieldNames[i]] = ""
 						}
@@ -303,7 +305,17 @@ func (r *Reader) Read(i int) (rec Record, err error) {
 				}
 			}
 		default: //String value (C, padded with blanks) -Notice: blanks removed by the trim above
-			rec[r.sFieldNames[i]] = fieldVal
+
+			var utf8_3 = charmap.ToUTF8(&charmap.CP866_UTF8_TABLE, []byte(fieldVal))
+			rec[r.sFieldNames[i]] = string(utf8_3[:])
+
+			//var str = fmt.Sprintf("%v", fieldVal)
+			//var ibm866 = []byte(str)
+			//var utf8_3 = charmap.ToUTF8(&charmap.CP866_UTF8_TABLE, ibm866)
+			//var st = string(utf8_3[:])
+			//rec[r.sFieldNames[i]] = st
+
+			//rec[r.sFieldNames[i]] = fieldVal
 		}
 		if err != nil {
 			return nil, err
